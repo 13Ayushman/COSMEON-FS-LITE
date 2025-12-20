@@ -1,0 +1,6 @@
+This prevents your test uploads from being sent to the cloud code repository
+
+orbital_mesh_storage/
+pycache/
+*.pyc
+.env
