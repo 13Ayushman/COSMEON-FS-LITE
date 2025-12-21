@@ -11,11 +11,17 @@ from werkzeug.utils import secure_filename
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# --- FORCE LOAD .ENV ---
+# This looks for .env in the backend folder AND the parent folder
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+load_dotenv(os.path.join(current_dir, '.env'))
+load_dotenv(os.path.join(parent_dir, '.env'))
 
 app = Flask(__name__)
 CORS(app)
+
+# ... (rest of your imports and config)
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
