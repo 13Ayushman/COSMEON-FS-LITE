@@ -3,278 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>COSMEON | Orbital Mesh Mission Control</title>
+    <title>Satellite Mesh Network</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Space+Mono&display=swap');
         
         body {
-            background: radial-gradient(circle at center, #0a0b1e 0%, #020205 100%);
-            color: #e2e8f0;
+            background-color: #050505;
+            color: #e0e0e0;
             font-family: 'Space Grotesk', sans-serif;
-            min-height: 100vh;
         }
 
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.6);
+        .mono { font-family: 'Space Mono', monospace; }
+
+        .glass {
+            background: rgba(20, 20, 25, 0.7);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .node-card {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .node-online { border-left: 4px solid #10b981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.1); }
-        .node-offline { border-left: 4px solid #ef4444; opacity: 0.6; filter: grayscale(0.5); }
-
-        .scanline {
-            width: 100%;
-            height: 2px;
-            background: rgba(56, 189, 248, 0.1);
-            position: absolute;
-            animation: scan 4s linear infinite;
-        }
-
-        @keyframes scan {
-            from { top: 0; }
-            to { top: 100%; }
-        }
-
-        .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .node-active { color: #10b981; filter: drop-shadow(0 0 8px #10b981); }
+        .node-inactive { color: #ef4444; filter: drop-shadow(0 0 8px #ef4444); }
+        
+        .pulse { animation: pulse 2s infinite; }
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
         }
     </style>
 </head>
-<body class="p-4 md:p-8">
-    <div class="max-w-7xl mx-auto">
+<body class="p-4 md:p-10">
+    <div class="max-w-6xl mx-auto">
         <!-- Header -->
-        <header class="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
             <div>
-                <h1 class="text-4xl font-bold tracking-tighter text-sky-400">COSMEON <span class="text-slate-500 text-xl font-light">v3.1 Hybrid-Cloud</span></h1>
-                <p class="text-slate-400 uppercase tracking-widest text-xs mt-1">Global Distributed Data Mesh</p>
+                <h1 class="text-4xl font-bold tracking-tighter text-white">SATELLITE <span class="text-blue-500">MESH</span></h1>
+                <p class="text-gray-500 mono text-sm">Decentralized Storage Protocol v2.1</p>
             </div>
-            <div id="mesh-health-container" class="glass-panel px-6 py-3 rounded-full flex items-center gap-4 border border-sky-500/30">
-                <span class="text-xs font-bold text-slate-400">MESH HEALTH:</span>
-                <div class="w-32 bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div id="health-bar" class="bg-sky-500 h-full transition-all duration-1000" style="width: 0%"></div>
+            <div class="glass p-4 rounded-xl flex items-center gap-6">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase font-bold mb-1">Mesh Health</p>
+                    <div class="flex items-center gap-2">
+                        <div class="w-32 h-2 bg-gray-800 rounded-full overflow-hidden">
+                            <div id="health-bar" class="h-full bg-blue-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <span id="health-text" class="mono text-blue-400">0%</span>
+                    </div>
                 </div>
-                <span id="health-pct" class="text-sky-400 font-mono">0%</span>
+                <div class="h-10 w-px bg-gray-800"></div>
+                <div class="text-right">
+                    <p class="text-xs text-gray-500 uppercase font-bold">Uplink Status</p>
+                    <p id="connection-status" class="text-yellow-500 mono animate-pulse">CONNECTING...</p>
+                </div>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <!-- Control Panel -->
-            <div class="lg:col-span-4 space-y-6">
-                <div class="glass-panel p-6 rounded-2xl relative overflow-hidden">
-                    <div class="scanline"></div>
-                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                        <i class="fas fa-satellite-dish text-sky-400"></i> Data Uplink
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left: Uplink Control -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="glass p-6 rounded-2xl">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        Transmit Data
                     </h2>
-                    
-                    <div class="space-y-4">
-                        <div class="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center hover:border-sky-500 transition-colors cursor-pointer relative" id="drop-zone">
-                            <input type="file" id="file-input" class="hidden">
-                            <i class="fas fa-cloud-upload-alt text-4xl text-slate-600 mb-2"></i>
-                            <p class="text-sm text-slate-400" id="file-name">Click or drag to stage file</p>
-                        </div>
-                        
-                        <button onclick="uploadFile()" id="upload-btn" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
-                            <span>TRANSMIT TO CLOUD</span>
-                        </button>
-                    </div>
-
-                    <div id="upload-status" class="mt-4 p-3 rounded-lg hidden text-xs font-mono"></div>
+                    <input type="file" id="fileInput" class="hidden">
+                    <button onclick="document.getElementById('fileInput').click()" class="w-full border-2 border-dashed border-gray-700 hover:border-blue-500 py-10 rounded-xl transition-all group">
+                        <span class="text-gray-500 group-hover:text-blue-400 transition-colors">Select File for Fragmentation</span>
+                    </button>
+                    <button id="uploadBtn" onclick="uploadFile()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        INITIATE UPLINK
+                    </button>
                 </div>
 
-                <div class="glass-panel p-6 rounded-2xl">
-                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                        <i class="fas fa-download text-sky-400"></i> Retrieval
-                    </h2>
-                    <div class="flex gap-2">
-                        <input type="text" id="dl-filename" placeholder="Enter original filename" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 w-full text-sm focus:outline-none focus:border-sky-500">
-                        <button onclick="downloadFile()" class="bg-slate-800 hover:bg-slate-700 px-4 rounded-lg transition-colors">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
+                <div class="glass p-6 rounded-2xl">
+                    <h2 class="text-xl font-bold mb-4">System Console</h2>
+                    <div id="console" class="h-48 overflow-y-auto font-mono text-xs space-y-1 text-gray-400 p-2 bg-black rounded-lg">
+                        > Awaiting system start...
                     </div>
                 </div>
             </div>
 
-            <!-- Global Satellite Mesh -->
-            <div class="lg:col-span-8">
-                <div class="glass-panel p-6 rounded-3xl min-h-[500px]">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-bold tracking-tight">Active Orbital Nodes</h2>
-                        <span class="bg-sky-500/10 text-sky-400 text-[10px] px-2 py-1 rounded border border-sky-500/20">REAL-TIME TELEMETRY</span>
-                    </div>
-
-                    <div id="nodes-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Nodes populated by JS -->
-                        <div class="col-span-full py-20 text-center text-slate-500 animate-pulse">
-                            <i class="fas fa-wifi text-4xl mb-4"></i>
-                            <p>Connecting to Mesh Core...</p>
-                        </div>
-                    </div>
-
-                    <div class="mt-8 border-t border-slate-800 pt-6">
-                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Storage Provider Logs</h3>
-                        <div id="log-feed" class="bg-black/40 rounded-lg p-4 font-mono text-[10px] h-32 overflow-y-auto space-y-1 text-slate-400">
-                            <div>[SYSTEM] Initializing secure cloud mesh...</div>
-                        </div>
-                    </div>
+            <!-- Right: Node Map -->
+            <div class="lg:col-span-2 glass p-6 rounded-3xl relative overflow-hidden">
+                <h2 class="text-2xl font-bold mb-8">Orbital Node Status</h2>
+                <div id="nodes-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Nodes injected here -->
                 </div>
+                
+                <!-- Decorative background grid -->
+                <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(#4f46e5 1px, transparent 1px); background-size: 30px 30px;"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Use window.location.origin if frontend is served by Flask, otherwise fallback to localhost
-        const API_URL = window.location.origin.includes('5000') ? window.location.origin : "http://127.0.0.1:5000";
-        
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const fileNameDisp = document.getElementById('file-name');
-
-        dropZone.onclick = () => fileInput.click();
-        fileInput.onchange = (e) => {
-            if(e.target.files.length) fileNameDisp.innerText = e.target.files[0].name;
+        const API_BASE = "http://localhost:5000/api";
+        const log = (msg) => {
+            const consoleDiv = document.getElementById('console');
+            consoleDiv.innerHTML += `<div><span class="text-blue-500">></span> ${msg}</div>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
         };
 
-        async function updateStatus() {
+        async function fetchStatus() {
             try {
-                const res = await fetch(`${API_URL}/api/status`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                
+                const res = await fetch(`${API_BASE}/status`);
                 const data = await res.json();
                 
+                document.getElementById('connection-status').innerText = "STABLE";
+                document.getElementById('connection-status').className = "text-green-500 mono";
+                
                 document.getElementById('health-bar').style.width = `${data.mesh_health}%`;
-                document.getElementById('health-pct').innerText = `${Math.round(data.mesh_health)}%`;
+                document.getElementById('health-text').innerText = `${Math.round(data.mesh_health)}%`;
 
-                const grid = document.getElementById('nodes-grid');
-                grid.innerHTML = '';
+                const container = document.getElementById('nodes-container');
+                container.innerHTML = '';
 
                 Object.keys(data.node_status).forEach(nodeId => {
-                    const online = data.node_status[nodeId];
+                    const isActive = data.node_status[nodeId];
                     const location = data.node_locations[nodeId];
-                    
                     const card = document.createElement('div');
-                    card.className = `node-card glass-panel p-4 rounded-xl flex items-center justify-between ${online ? 'node-online' : 'node-offline'}`;
+                    card.className = `p-4 rounded-xl border transition-all cursor-pointer ${isActive ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'}`;
+                    card.onclick = () => toggleNode(nodeId);
                     
                     card.innerHTML = `
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
-                                <i class="fas ${online ? 'fa-satellite' : 'fa-satellite-dish'} ${online ? 'text-sky-400' : 'text-slate-500'}"></i>
-                            </div>
+                        <div class="flex justify-between items-center">
                             <div>
-                                <h3 class="font-bold text-sm uppercase">${nodeId.replace('_', ' ')}</h3>
-                                <p class="text-[10px] text-slate-500">${location}</p>
+                                <p class="text-xs text-gray-500 uppercase">${nodeId.replace('_', ' ')}</p>
+                                <p class="font-bold text-sm">${location}</p>
+                            </div>
+                            <div class="${isActive ? 'node-active' : 'node-inactive'}">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
                             </div>
                         </div>
-                        <button onclick="toggleNode('${nodeId}')" class="text-xs px-3 py-1 rounded-md border ${online ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5' : 'border-rose-500/30 text-rose-400 bg-rose-500/5'}">
-                            ${online ? 'ONLINE' : 'OFFLINE'}
-                        </button>
                     `;
-                    grid.appendChild(card);
+                    container.appendChild(card);
                 });
-            } catch (e) {
-                console.warn("Status Sync Failed:", e.message);
-                // Only log once to avoid cluttering console
-                if (!window.hasLoggedSyncError) {
-                    log(`[CONNECTIVITY] Core Mesh at ${API_URL} unreachable. Retrying...`);
-                    window.hasLoggedSyncError = true;
-                }
+            } catch (err) {
+                document.getElementById('connection-status').innerText = "OFFLINE";
+                document.getElementById('connection-status').className = "text-red-500 mono";
+                log("Error connecting to terminal backend...");
             }
         }
 
         async function toggleNode(nodeId) {
-            try {
-                const res = await fetch(`${API_URL}/api/toggle_node/${nodeId}`, { method: 'POST' });
-                if (!res.ok) throw new Error("Toggle Failed");
-                log(`[SIGNAL] Node ${nodeId} state changed`);
-                updateStatus();
-            } catch (e) {
-                log(`[ERROR] Unable to toggle node: ${e.message}`);
-            }
+            await fetch(`${API_BASE}/toggle_node/${nodeId}`, {method: 'POST'});
+            log(`Toggled status for ${nodeId}`);
+            fetchStatus();
         }
 
         async function uploadFile() {
-            const file = fileInput.files[0];
-            if(!file) return alert("Select a file first");
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) return log("No file selected!");
 
-            const btn = document.getElementById('upload-btn');
-            const status = document.getElementById('upload-status');
-            
+            const btn = document.getElementById('uploadBtn');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> FRAGMENTING...';
-            status.className = "mt-4 p-3 rounded-lg block bg-sky-500/10 text-sky-400";
-            status.innerText = "Splitting data across global regions...";
+            btn.innerText = "FRAGMENTING...";
+            log(`Initiating fragmentation for: ${fileInput.files[0].name}`);
 
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', fileInput.files[0]);
 
             try {
-                const res = await fetch(`${API_URL}/api/upload`, {
+                const res = await fetch(`${API_BASE}/upload`, {
                     method: 'POST',
                     body: formData
                 });
                 const result = await res.json();
-
-                if(result.success) {
-                    log(`[UPLOAD] File shredded and distributed successfully`);
-                    log(`[HASH] Integrity verified: ${result.integrity_hash.substring(0,20)}...`);
-                    status.className = "mt-4 p-3 rounded-lg block bg-emerald-500/10 text-emerald-400";
-                    status.innerText = "SUCCESS: Distributed to 5 global cloud nodes";
+                if (result.success) {
+                    log(`SUCCESS: File split across active nodes.`);
+                    log(`Integrity Hash: ${result.integrity_hash.substring(0, 16)}...`);
                 } else {
-                    throw new Error(result.error);
+                    log(`FAILURE: ${result.error}`);
                 }
-            } catch (e) {
-                status.className = "mt-4 p-3 rounded-lg block bg-rose-500/10 text-rose-400";
-                status.innerText = `ERROR: ${e.message}`;
+            } catch (err) {
+                log("Uplink failed. Check backend terminal.");
             } finally {
                 btn.disabled = false;
-                btn.innerText = "TRANSMIT TO CLOUD";
+                btn.innerText = "INITIATE UPLINK";
             }
         }
 
-        async function downloadFile() {
-            const filename = document.getElementById('dl-filename').value;
-            if(!filename) return alert("Enter filename");
-
-            log(`[RETRIEVAL] Requesting fragments for ${filename}...`);
-            try {
-                const res = await fetch(`${API_URL}/api/download/${filename}`);
-                if(!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error);
-                }
-                
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                log(`[SUCCESS] File reassembled and verified.`);
-            } catch (e) {
-                log(`[CRITICAL] Retrieval failed: ${e.message}`);
-                alert(e.message);
-            }
-        }
-
-        function log(msg) {
-            const feed = document.getElementById('log-feed');
-            const entry = document.createElement('div');
-            entry.innerText = `> ${new Date().toLocaleTimeString()} ${msg}`;
-            feed.prepend(entry);
-        }
-
-        setInterval(updateStatus, 3000);
-        updateStatus();
+        setInterval(fetchStatus, 3000);
+        fetchStatus();
+        log("System initialized. Awaiting user commands.");
     </script>
 </body>
 </html>
