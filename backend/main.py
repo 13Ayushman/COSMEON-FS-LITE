@@ -1,108 +1,170 @@
 import os
-import math
 import hashlib
-import uvicorn
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-import shutil
+import uvicorn
 
-app = FastAPI(title="Cosmeon Cloud Shredder API")
+# ================= CONFIG =================
+CHUNK_SIZE = 1024 * 1024  # 1 MB
 
-# Enable CORS so your React dashboard can talk to this API
+BASE_DIR = os.path.dirname(__file__)
+NODES_DIR = os.path.join(BASE_DIR, "simulated_nodes")
+RESTORE_DIR = os.path.join(BASE_DIR, "restored")
+
+NODES = [f"node_{i}" for i in range(1, 6)]
+
+# Create directories
+for node in NODES:
+    os.makedirs(os.path.join(NODES_DIR, node), exist_ok=True)
+os.makedirs(RESTORE_DIR, exist_ok=True)
+
+# ================= APP =================
+app = FastAPI(title="COSMEON FS-LITE Backend")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["*"],   # OK for hackathon/demo
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configuration
-VAULT_DIR = "vault"
-OUTPUT_DIR = "restored"
+# ================= IN-MEMORY REGISTRY =================
+# NOTE: In production this would be Supabase / DB
+FILE_INDEX = {}
 
-for folder in [VAULT_DIR, OUTPUT_DIR]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+# ================= HELPERS =================
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
-class CloudShredder:
-    def generate_shard_id(self, filename, index):
-        """Creates a unique hash-based identity for a fragment."""
-        hash_input = f"{filename}_{index}_{os.urandom(8)}"
-        return hashlib.sha256(hash_input.encode()).hexdigest()[:12]
+# ================= API =================
 
-    def shred_content(self, content: bytes, filename: str, shard_count: int):
-        file_size = len(content)
-        chunk_size = math.ceil(file_size / shard_count)
-        shards_info = []
+@app.get("/status")
+def status():
+    node_status = {}
+    for node in NODES:
+        node_status[node] = os.path.exists(os.path.join(NODES_DIR, node))
 
-        for i in range(shard_count):
-            start = i * chunk_size
-            end = min(start + chunk_size, file_size)
-            chunk_data = content[start:end]
-            
-            if not chunk_data:
-                break
-                
-            shard_id = self.generate_shard_id(filename, i)
-            shard_name = f"{filename}.shard_{i}.{shard_id}.bin"
-            shard_path = os.path.join(VAULT_DIR, shard_name)
-            
-            with open(shard_path, 'wb') as shard_file:
-                shard_file.write(chunk_data)
-            
-            shards_info.append({
-                "index": i,
-                "shard_id": shard_id,
-                "name": shard_name,
-                "size": len(chunk_data)
-            })
-        
-        return shards_info
+    mesh_health = int((sum(node_status.values()) / len(NODES)) * 100)
 
-engine = CloudShredder()
+    return {
+        "mesh_health": mesh_health,
+        "node_status": node_status
+    }
 
-@app.get("/")
-async def root():
-    return {"message": "Cosmeon Shredder API is Online", "vault_status": "Active"}
 
-@app.post("/shred")
-async def api_shred(file: UploadFile = File(...), shards: int = Form(4)):
-    try:
-        content = await file.read()
-        shard_data = engine.shred_content(content, file.filename, shards)
-        
-        return {
-            "status": "success",
-            "filename": file.filename,
-            "original_size": len(content),
-            "shards_created": len(shard_data),
-            "shards": shard_data
+@app.post("/upload")
+async def upload(file: UploadFile = File(...)):
+    content = await file.read()
+
+    if not content:
+        raise HTTPException(400, "Empty file")
+
+    file_id = hashlib.md5(file.filename.encode()).hexdigest()[:8]
+
+    FILE_INDEX[file_id] = {
+        "filename": file.filename,
+        "chunks": []
+    }
+
+    chunk_index = 0
+
+    for i in range(0, len(content), CHUNK_SIZE):
+        chunk = content[i:i + CHUNK_SIZE]
+        checksum = sha256(chunk)
+
+        node = NODES[chunk_index % len(NODES)]
+        node_path = os.path.join(NODES_DIR, node)
+
+        chunk_name = f"{file_id}.part{chunk_index}"
+        chunk_path = os.path.join(node_path, chunk_name)
+
+        with open(chunk_path, "wb") as f:
+            f.write(chunk)
+
+        FILE_INDEX[file_id]["chunks"].append({
+            "index": chunk_index,
+            "node": node,
+            "name": chunk_name,
+            "hash": checksum,
+            "size": len(chunk)
+        })
+
+        chunk_index += 1
+
+    return {
+        "status": "stored",
+        "file_id": file_id,
+        "chunks": chunk_index
+    }
+
+
+@app.get("/files")
+def list_files():
+    return [
+        {
+            "id": fid,
+            "filename": meta["filename"],
+            "size": sum(c["size"] for c in meta["chunks"])
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        for fid, meta in FILE_INDEX.items()
+    ]
 
-@app.post("/reassemble/{filename}")
-async def api_reassemble(filename: str):
-    shards = [f for f in os.listdir(VAULT_DIR) if f.startswith(filename + ".shard_")]
-    shards.sort(key=lambda x: int(x.split('.shard_')[1].split('.')[0]))
 
-    if not shards:
-        raise HTTPException(status_code=404, detail="No fragments found for this file.")
+@app.get("/download/{file_id}")
+def download(file_id: str):
+    if file_id not in FILE_INDEX:
+        raise HTTPException(404, "File not found")
 
-    output_path = os.path.join(OUTPUT_DIR, filename)
-    try:
-        with open(output_path, 'wb') as output_f:
-            for shard_name in shards:
-                with open(os.path.join(VAULT_DIR, shard_name), 'rb') as s_file:
-                    output_f.write(s_file.read())
-        
-        return {"status": "restored", "path": output_path}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    output_path = os.path.join(RESTORE_DIR, FILE_INDEX[file_id]["filename"])
 
+    with open(output_path, "wb") as out:
+        for chunk in FILE_INDEX[file_id]["chunks"]:
+            chunk_path = os.path.join(
+                NODES_DIR,
+                chunk["node"],
+                chunk["name"]
+            )
+
+            if not os.path.exists(chunk_path):
+                raise HTTPException(
+                    500,
+                    f"Missing chunk {chunk['name']} on {chunk['node']}"
+                )
+
+            with open(chunk_path, "rb") as f:
+                data = f.read()
+                if sha256(data) != chunk["hash"]:
+                    raise HTTPException(500, "Checksum mismatch detected")
+                out.write(data)
+
+    return FileResponse(
+        output_path,
+        filename=FILE_INDEX[file_id]["filename"],
+        media_type="application/octet-stream"
+    )
+
+
+@app.delete("/delete/{file_id}")
+def delete(file_id: str):
+    if file_id not in FILE_INDEX:
+        raise HTTPException(404, "File not found")
+
+    for chunk in FILE_INDEX[file_id]["chunks"]:
+        path = os.path.join(
+            NODES_DIR,
+            chunk["node"],
+            chunk["name"]
+        )
+        if os.path.exists(path):
+            os.remove(path)
+
+    del FILE_INDEX[file_id]
+
+    return {"status": "deleted"}
+
+
+# ================= RUN =================
 if __name__ == "__main__":
-    # Render provides the PORT environment variable automatically
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
