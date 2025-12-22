@@ -1,127 +1,106 @@
 import os
-import uuid
-import shutil
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from typing import List
-from contextlib import asynccontextmanager
+import math
+import hashlib
+from concurrent.futures import ThreadPoolExecutor
 
-# --- CONFIGURATION ---
-UPLOAD_DIR = "shards"
-RECONSTRUCT_DIR = "reconstructed"
+class CloudShredder:
+    """
+    Core engine for fragmenting files into encrypted shards.
+    This simulates the logic used to split and distribute data.
+    """
+    
+    def __init__(self, output_dir="vault"):
+        self.output_dir = output_dir
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
-# Ensure directories exist
-for d in [UPLOAD_DIR, RECONSTRUCT_DIR]:
-    if not os.path.exists(d):
-        os.makedirs(d)
+    def generate_shard_id(self, filename, index):
+        """Creates a unique hash-based identity for a fragment."""
+        hash_input = f"{filename}_{index}_{os.urandom(8)}"
+        return hashlib.sha256(hash_input.encode()).hexdigest()[:12]
 
-# --- LIFESPAN (Replaces deprecated on_event) ---
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup Logic
-    print("\n==============================")
-    print("   COSMEON SECURE SERVER")
-    print("==============================")
-    print(f"Target: http://127.0.0.1:8000")
-    yield
-    # Shutdown Logic (Optional)
-    print("Server shutting down...")
+    def shred_file(self, file_path, shard_count=4):
+        """
+        Splits a file into N fragments.
+        In a production environment, these would be encrypted and 
+        uploaded to different storage providers.
+        """
+        if not os.path.isfile(file_path):
+            print(f"[-] Error: {file_path} not found.")
+            return False
 
-app = FastAPI(lifespan=lifespan)
-
-# --- CORS ---
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- DATABASE (In-Memory for Lite version) ---
-# In a full version, this would be a JSON file or SQLite
-file_registry = {}
-
-# --- ROUTES ---
-
-@app.get("/")
-async def root():
-    return {"status": "online", "system": "COSMEON FS-LITE"}
-
-@app.get("/files")
-async def list_files():
-    """Returns the list of fragmented files for the dashboard."""
-    return list(file_registry.values())
-
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    """Fragments a file and stores it."""
-    try:
-        file_id = str(uuid.uuid4())
-        file_content = await file.read()
+        file_size = os.path.getsize(file_path)
+        chunk_size = math.ceil(file_size / shard_count)
+        base_name = os.path.basename(file_path)
         
-        # Logic: Split file into 4 shards (Simulation)
-        shard_size = len(file_content) // 4
-        shards_created = 0
+        print(f"[+] Initiating shredding for: {base_name} ({file_size} bytes)")
         
-        for i in range(4):
-            start = i * shard_size
-            # Last shard takes the remainder
-            end = (i + 1) * shard_size if i < 3 else len(file_content)
+        try:
+            with open(file_path, 'rb') as f:
+                for i in range(shard_count):
+                    chunk_data = f.read(chunk_size)
+                    if not chunk_data:
+                        break
+                        
+                    shard_id = self.generate_shard_id(base_name, i)
+                    shard_name = f"{base_name}.shard_{i}.{shard_id}.bin"
+                    shard_path = os.path.join(self.output_dir, shard_name)
+                    
+                    with open(shard_path, 'wb') as shard_file:
+                        shard_file.write(chunk_data)
+                    
+                    print(f"    -> Fragment {i+1} distributed: {shard_name}")
             
-            shard_path = os.path.join(UPLOAD_DIR, f"{file_id}_part_{i}.shard")
-            with open(shard_path, "wb") as f:
-                f.write(file_content[start:end])
-            shards_created += 1
+            print(f"[+] Successfully shredded into {shard_count} shards.")
+            return True
+        except Exception as e:
+            print(f"[-] Critical failure: {str(e)}")
+            return False
 
-        # Register file
-        entry = {
-            "id": file_id,
-            "filename": file.filename,
-            "shard_count": shards_created,
-            "size": len(file_content)
-        }
-        file_registry[file_id] = entry
+    def reassemble_file(self, original_filename, output_name):
+        """
+        Locates shards in the vault and reassembles them into the original file.
+        """
+        print(f"[+] Reassembling: {original_filename}")
         
-        return entry
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Gather all shards for this specific file
+        shards = [f for f in os.listdir(self.output_dir) if f.startswith(original_filename + ".shard_")]
+        # Sort by the shard index (the number after '.shard_')
+        shards.sort(key=lambda x: int(x.split('.shard_')[1].split('.')[0]))
 
-@app.get("/reconstruct/{file_id}")
-async def reconstruct_file(file_id: str):
-    """Reassembles shards and serves the file."""
-    if file_id not in file_registry:
-        raise HTTPException(status_code=404, detail="File ID not found")
+        if not shards:
+            print("[-] No fragments found for this identity.")
+            return
+
+        try:
+            with open(output_name, 'wb') as output_f:
+                for shard_name in shards:
+                    shard_path = os.path.join(self.output_dir, shard_name)
+                    with open(shard_path, 'rb') as s_file:
+                        output_f.write(s_file.read())
+            print(f"[+] Restoration complete: {output_name}")
+        except Exception as e:
+            print(f"[-] Restoration failed: {str(e)}")
+
+def main():
+    """Entry point for local CLI testing of the shredder logic."""
+    engine = CloudShredder()
     
-    metadata = file_registry[file_id]
-    output_path = os.path.join(RECONSTRUCT_DIR, metadata["filename"])
-    
-    try:
-        with open(output_path, "wb") as outfile:
-            for i in range(metadata["shard_count"]):
-                shard_path = os.path.join(UPLOAD_DIR, f"{file_id}_part_{i}.shard")
-                with open(shard_path, "rb") as infile:
-                    outfile.write(infile.read())
-        
-        return FileResponse(output_path, filename=metadata["filename"])
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reconstruction failed: {str(e)}")
+    print("--- COSMEON SHREDDER CLI ---")
+    print("1. Shred File")
+    print("2. Reassemble File")
+    choice = input("Select operation [1/2]: ")
 
-@app.delete("/files/{file_id}")
-async def delete_file(file_id: str):
-    """Purges shards from storage."""
-    if file_id in file_registry:
-        # Delete shard files
-        for i in range(file_registry[file_id]["shard_count"]):
-            shard_path = os.path.join(UPLOAD_DIR, f"{file_id}_part_{i}.shard")
-            if os.path.exists(shard_path):
-                os.remove(shard_path)
-        
-        del file_registry[file_id]
-        return {"message": "Shards purged successfully"}
-    raise HTTPException(status_code=404, detail="File not found")
+    if choice == "1":
+        path = input("Enter path to file: ")
+        shards = input("Number of shards (default 4): ") or "4"
+        engine.shred_file(path, int(shards))
+    elif choice == "2":
+        identity = input("Enter original filename identity: ")
+        out = input("Enter output filename: ")
+        engine.reassemble_file(identity, out)
+    else:
+        print("Invalid choice.")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    main()
