@@ -1,103 +1,127 @@
 import os
-import io
-import hashlib
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from supabase import create_client, Client
+import uuid
+import shutil
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from typing import List
+from contextlib import asynccontextmanager
 
-app = Flask(__name__, static_folder='../')
-CORS(app)
+# --- CONFIGURATION ---
+UPLOAD_DIR = "shards"
+RECONSTRUCT_DIR = "reconstructed"
 
-# --- CREDENTIALS ---
-SUPABASE_URL = "your_supabase_url"
-SUPABASE_KEY = "your_supabase_key"
+# Ensure directories exist
+for d in [UPLOAD_DIR, RECONSTRUCT_DIR]:
+    if not os.path.exists(d):
+        os.makedirs(d)
 
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    SYSTEM_ONLINE = True
-except:
-    SYSTEM_ONLINE = False
+# --- LIFESPAN (Replaces deprecated on_event) ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup Logic
+    print("\n==============================")
+    print("   COSMEON SECURE SERVER")
+    print("==============================")
+    print(f"Target: http://127.0.0.1:8000")
+    yield
+    # Shutdown Logic (Optional)
+    print("Server shutting down...")
 
-# Mapping your actual Supabase Buckets (Updated to match Node-1...Node-5)
-NODES = {
-    "node_1": "Node-1",
-    "node_2": "Node-2",
-    "node_3": "Node-3",
-    "node_4": "Node-4",
-    "node_5": "Node-5"
-}
-node_status = {name: True for name in NODES.keys()}
+app = FastAPI(lifespan=lifespan)
 
-@app.route('/')
-def serve_index():
-    return send_from_directory(app.static_folder, 'Dashboard.html')
+# --- CORS ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.route('/api/status', methods=['GET'])
-def get_status():
-    active = sum(1 for status in node_status.values() if status)
-    return jsonify({
-        "mesh_health": (active / len(NODES)) * 100,
-        "node_status": node_status,
-        "node_locations": NODES,
-        "supabase_connected": SYSTEM_ONLINE
-    })
+# --- DATABASE (In-Memory for Lite version) ---
+# In a full version, this would be a JSON file or SQLite
+file_registry = {}
 
-@app.route('/api/toggle_node/<node_id>', methods=['POST'])
-def toggle_node(node_id):
-    if node_id in node_status:
-        node_status[node_id] = not node_status[node_id]
-        return jsonify({"success": True})
-    return jsonify({"error": "Node not found"}), 404
+# --- ROUTES ---
 
-@app.route('/api/upload', methods=['POST'])
-def upload_file():
-    if not SYSTEM_ONLINE: 
-        return jsonify({"success": False, "error": "Cloud Handshake Offline"}), 500
+@app.get("/")
+async def root():
+    return {"status": "online", "system": "COSMEON FS-LITE"}
+
+@app.get("/files")
+async def list_files():
+    """Returns the list of fragmented files for the dashboard."""
+    return list(file_registry.values())
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Fragments a file and stores it."""
+    try:
+        file_id = str(uuid.uuid4())
+        file_content = await file.read()
+        
+        # Logic: Split file into 4 shards (Simulation)
+        shard_size = len(file_content) // 4
+        shards_created = 0
+        
+        for i in range(4):
+            start = i * shard_size
+            # Last shard takes the remainder
+            end = (i + 1) * shard_size if i < 3 else len(file_content)
+            
+            shard_path = os.path.join(UPLOAD_DIR, f"{file_id}_part_{i}.shard")
+            with open(shard_path, "wb") as f:
+                f.write(file_content[start:end])
+            shards_created += 1
+
+        # Register file
+        entry = {
+            "id": file_id,
+            "filename": file.filename,
+            "shard_count": shards_created,
+            "size": len(file_content)
+        }
+        file_registry[file_id] = entry
+        
+        return entry
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reconstruct/{file_id}")
+async def reconstruct_file(file_id: str):
+    """Reassembles shards and serves the file."""
+    if file_id not in file_registry:
+        raise HTTPException(status_code=404, detail="File ID not found")
     
-    if 'file' not in request.files:
-        return jsonify({"success": False, "error": "No file detected"}), 400
-
-    file = request.files['file']
-    file_data = file.read()
-    file_hash = hashlib.sha256(file_data).hexdigest()
-    
-    # Split into 5 fragments
-    chunk_size = max(1, len(file_data) // 5)
-    chunks = [file_data[i:i + chunk_size] for i in range(0, len(file_data), chunk_size)]
-    
-    upload_results = []
+    metadata = file_registry[file_id]
+    output_path = os.path.join(RECONSTRUCT_DIR, metadata["filename"])
     
     try:
-        for i in range(5):
-            node_id = f"node_{i+1}"
-            bucket_name = NODES[node_id]
-            
-            # Only upload if node is 'active' in UI
-            if node_status[node_id]:
-                frag_data = chunks[i] if i < len(chunks) else b"0"
-                filename = f"fragment_{file_hash[:6]}_{file.filename}"
-                
-                # UPLOAD TO BUCKET
-                # The .upload() method returns a response object.
-                # In some versions of the library, errors are handled via exceptions.
-                supabase.storage.from_(bucket_name).upload(
-                    path=filename,
-                    file=frag_data,
-                    file_options={"content-type": "application/octet-stream", "upsert": "true"}
-                )
-                upload_results.append(bucket_name)
-
-        return jsonify({
-            "success": True, 
-            "integrity_hash": file_hash,
-            "message": f"Successfully sharded across: {', '.join(upload_results)}"
-        })
+        with open(output_path, "wb") as outfile:
+            for i in range(metadata["shard_count"]):
+                shard_path = os.path.join(UPLOAD_DIR, f"{file_id}_part_{i}.shard")
+                with open(shard_path, "rb") as infile:
+                    outfile.write(infile.read())
+        
+        return FileResponse(output_path, filename=metadata["filename"])
     except Exception as e:
-        print(f"Detailed Server Error: {str(e)}")
-        # If the error contains '404', it means the bucket name is still slightly off
-        return jsonify({"success": False, "error": f"Storage Error: {str(e)}"}), 500
+        raise HTTPException(status_code=500, detail=f"Reconstruction failed: {str(e)}")
 
-if __name__ == '__main__':
-    print("\n🛰️  SATELLITE MESH ONLINE")
-    print("Targeting Buckets: Node-1, Node-2, Node-3, Node-4, Node-5")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+@app.delete("/files/{file_id}")
+async def delete_file(file_id: str):
+    """Purges shards from storage."""
+    if file_id in file_registry:
+        # Delete shard files
+        for i in range(file_registry[file_id]["shard_count"]):
+            shard_path = os.path.join(UPLOAD_DIR, f"{file_id}_part_{i}.shard")
+            if os.path.exists(shard_path):
+                os.remove(shard_path)
+        
+        del file_registry[file_id]
+        return {"message": "Shards purged successfully"}
+    raise HTTPException(status_code=404, detail="File not found")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
