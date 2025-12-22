@@ -3,145 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>COSMEON | Cloud Inventory</title>
+    <title>Cosmeon Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
-        body { 
-            background: #050505; 
-            color: #fff; 
-            font-family: 'Space Grotesk', sans-serif; 
-            background-image: radial-gradient(circle at 50% 50%, #111 0%, #050505 100%);
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&display=swap');
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .shred-gradient { background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .shred-animation { animation: scan 2s linear infinite; }
+        @keyframes scan {
+            0% { transform: translateY(-100%); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(100%); opacity: 0; }
         }
-        .glass { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
-        .shimmer { animation: shimmer 2s infinite; }
-        @keyframes shimmer { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
     </style>
 </head>
-<body class="p-4 md:p-12 min-h-screen">
-    <div class="max-w-5xl mx-auto">
+<body class="min-h-screen p-4 md:p-8">
+    <div class="max-w-6xl mx-auto space-y-8">
         <!-- Header -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 glass p-6 rounded-3xl">
             <div>
-                <h1 class="text-3xl font-black italic tracking-tighter">COSMEON <span class="text-blue-500">FS-LITE</span></h1>
-                <p class="text-gray-500 text-xs uppercase tracking-[0.2em] mt-1">Distributed Shard Repository</p>
+                <h1 class="text-3xl font-bold tracking-tighter text-transparent bg-clip-text shred-gradient">COSMEON ENGINE</h1>
+                <p class="text-slate-400 text-sm">Secure Distributed Fragmentation Protocol</p>
             </div>
-            
-            <div class="flex flex-wrap gap-4 items-center">
-                <div class="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                    <span class="w-2 h-2 bg-green-500 rounded-full shimmer"></span>
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-green-500">Engine Live</span>
+            <div id="connection-status" class="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 text-red-400 text-xs font-bold border border-red-500/20">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                CORE OFFLINE
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Upload/Shred Panel -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="glass p-8 rounded-3xl relative overflow-hidden">
+                    <div id="shredding-overlay" class="hidden absolute inset-0 bg-slate-900/80 z-10 flex flex-col items-center justify-center space-y-4">
+                        <div class="w-16 h-1 bg-blue-500 shred-animation"></div>
+                        <p class="text-blue-400 font-bold animate-pulse">SHREDDING DATA...</p>
+                    </div>
+                    
+                    <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        Fragment Source
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div class="group relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-slate-700 rounded-2xl hover:border-blue-500 transition-colors cursor-pointer bg-slate-800/50">
+                            <input type="file" id="file-input" class="absolute inset-0 opacity-0 cursor-pointer">
+                            <div class="text-center p-4">
+                                <p id="file-name" class="text-sm text-slate-400 group-hover:text-blue-400 transition-colors">Drag or click to select file</p>
+                            </div>
+                        </div>
+                        
+                        <button id="shred-btn" class="w-full py-4 rounded-xl shred-gradient font-bold shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                            EXECUTE SHRED
+                        </button>
+                    </div>
                 </div>
-                <a href="vault.html" class="bg-blue-600 hover:bg-blue-500 transition-colors px-6 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/20">
-                    + New Asset
-                </a>
-            </div>
-        </div>
 
-        <!-- Inventory State -->
-        <div id="fileList" class="glass rounded-3xl overflow-hidden divide-y divide-white/5 min-h-[300px] flex flex-col justify-center">
-            <div class="p-20 text-center">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-                <p class="text-gray-500 italic text-sm">Synchronizing with Render Cluster...</p>
+                <div id="status-box" class="p-4 rounded-2xl bg-slate-800/50 border border-slate-700 text-xs font-mono text-slate-400 min-h-[100px] overflow-y-auto">
+                    > System standby...
+                </div>
             </div>
-        </div>
 
-        <!-- Footer Stats -->
-        <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="glass p-4 rounded-2xl">
-                <p class="text-[10px] text-gray-500 uppercase font-bold">Protocol</p>
-                <p class="text-sm font-mono text-blue-400">AES-256 + Sharding</p>
-            </div>
-            <div class="glass p-4 rounded-2xl">
-                <p class="text-[10px] text-gray-500 uppercase font-bold">Backend Status</p>
-                <p class="text-sm font-mono text-green-400">Connected</p>
-            </div>
-            <div class="glass p-4 rounded-2xl">
-                <p class="text-[10px] text-gray-500 uppercase font-bold">Node URL</p>
-                <p class="text-sm font-mono text-gray-400 truncate">cosmeon-fs-lite.onrender.com</p>
+            <!-- Dashboard/Table Panel -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="glass rounded-3xl overflow-hidden">
+                    <div class="p-6 border-b border-slate-700 flex justify-between items-center">
+                        <h2 class="text-xl font-semibold">Active Shards</h2>
+                        <button onclick="fetchShards()" class="text-xs text-slate-400 hover:text-white transition-colors">REFRESH LIST</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-900/50 text-slate-500 text-xs uppercase tracking-wider">
+                                <tr>
+                                    <th class="px-6 py-4">Data Identity</th>
+                                    <th class="px-6 py-4 text-center">Consistency</th>
+                                    <th class="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="shard-list" class="divide-y divide-slate-800">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                        <div id="empty-state" class="p-12 text-center text-slate-500">
+                            No fragments detected in the cloud vault.
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Modals / Messages -->
+    <div id="toast" class="fixed bottom-8 right-8 px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 shadow-2xl translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+        <span id="toast-msg"></span>
+    </div>
+
     <script>
-        const API_URL = 'https://cosmeon-fs-lite.onrender.com';
+        /**
+         * GLOBAL CONFIGURATION
+         * Replace with your actual project details from Supabase dashboard
+         */
+        const SUPABASE_URL = ''; 
+        const SUPABASE_KEY = ''; 
+        const BUCKET_NAME = 'shards';
 
-        async function loadFiles() {
-            const list = document.getElementById('fileList');
-            try {
-                const res = await fetch(`${API_URL}/files`);
-                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-                
-                const data = await res.json();
-                // Handle different possible response formats from PocketHost/Backend
-                const files = Array.isArray(data) ? data : (data.items || []);
+        // Use a unique name for the local instance to avoid conflicts with global window.supabase
+        let supabaseClient = null;
 
-                if(files.length === 0) {
-                    list.innerHTML = `
-                        <div class="p-20 text-center">
-                            <p class="text-gray-600 mb-2">No encrypted shards detected in the vault.</p>
-                            <p class="text-[10px] text-gray-700 uppercase tracking-widest">Waiting for initial upload...</p>
-                        </div>
-                    `;
-                    return;
+        const fileInput = document.getElementById('file-input');
+        const fileNameLabel = document.getElementById('file-name');
+        const shredBtn = document.getElementById('shred-btn');
+        const statusBox = document.getElementById('status-box');
+        const shardList = document.getElementById('shard-list');
+        const emptyState = document.getElementById('empty-state');
+        const overlay = document.getElementById('shredding-overlay');
+
+        function log(msg) {
+            const time = new Date().toLocaleTimeString([], { hour12: false });
+            statusBox.innerHTML = `<div>[${time}] ${msg}</div>` + statusBox.innerHTML;
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            t.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-24', 'opacity-0'), 3000);
+        }
+
+        // Initialize Supabase Client
+        function initApp() {
+            if (window.supabase) {
+                try {
+                    // Create the client and assign to the distinct local variable
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                    
+                    const statusEl = document.getElementById('connection-status');
+                    statusEl.innerHTML = 'CORE ONLINE';
+                    statusEl.className = 'flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20';
+                    
+                    log('Supabase engine initialized.');
+                    fetchShards();
+                } catch (e) {
+                    log('Error initializing engine: ' + e.message);
                 }
-
-                list.innerHTML = files.map(f => `
-                    <div class="p-6 flex flex-col md:flex-row justify-between items-start md:items-center hover:bg-white/[0.04] transition-all group">
-                        <div class="mb-4 md:mb-0">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-sm text-gray-200 group-hover:text-blue-400 transition-colors">${f.filename || f.original_name}</h3>
-                                    <p class="text-[10px] text-gray-500 font-mono mt-0.5">ID: ${f.file_id || f.id}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
-                            <div class="text-right hidden sm:block">
-                                <p class="text-[9px] text-gray-500 uppercase tracking-tighter">Availability</p>
-                                <p class="text-[10px] text-green-500 font-bold">3/3 SHARDS READY</p>
-                            </div>
-                            <button onclick="download('${f.file_id || f.id}')" 
-                                class="bg-white/5 hover:bg-blue-600/20 border border-white/10 hover:border-blue-500/50 px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all">
-                                Reconstruct
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (e) {
-                console.error("Fetch error:", e);
-                list.innerHTML = `
-                    <div class="p-20 text-center">
-                        <p class="text-red-500 font-bold mb-2">Sync Error</p>
-                        <p class="text-gray-500 text-xs">${e.message}</p>
-                        <button onclick="loadFiles()" class="mt-4 text-blue-500 text-[10px] uppercase underline">Retry Connection</button>
-                    </div>
-                `;
+            } else {
+                log('Fatal: Supabase SDK not found.');
             }
         }
 
-        function download(id) {
-            // Pointing directly to the reconstruct endpoint on Render
-            const downloadUrl = `${API_URL}/reconstruct/${id}`;
-            
-            // UI feedback
-            const btn = event.target;
-            const originalText = btn.innerText;
-            btn.innerText = "SHREDDING...";
-            btn.disabled = true;
-            
-            setTimeout(() => {
-                window.location.href = downloadUrl;
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }, 1000);
+        window.addEventListener('DOMContentLoaded', initApp);
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                fileNameLabel.innerText = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                log(`Source detected: ${file.name}`);
+            }
+        });
+
+        async function fetchShards() {
+            if (!supabaseClient) return;
+            try {
+                const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).list('', {
+                    sortBy: { column: 'created_at', order: 'desc' }
+                });
+
+                if (error) {
+                    log('Fetch error: ' + error.message);
+                    return;
+                }
+
+                // Filter for folders (fragments sets)
+                const folders = data.filter(item => !item.id); 
+                
+                shardList.innerHTML = '';
+                if (folders.length === 0) {
+                    emptyState.style.display = 'block';
+                } else {
+                    emptyState.style.display = 'none';
+                    folders.forEach(folder => {
+                        const row = document.createElement('tr');
+                        row.className = 'hover:bg-slate-800/30 transition-colors group';
+                        row.innerHTML = `
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold text-xs">
+                                        S
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium text-slate-200">${folder.name}</div>
+                                        <div class="text-[10px] text-slate-500 uppercase">Secure Fragment Set</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center justify-center">
+                                    <span class="px-2 py-1 rounded-md bg-green-500/10 text-green-400 text-[10px] font-bold">100% HEALTH</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-right space-x-2">
+                                <button onclick="downloadAndAssemble('${folder.name}')" class="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all" title="Reassemble & Download">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                <button onclick="deleteShred('${folder.name}')" class="p-2 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all" title="Purge Fragments">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </td>
+                        `;
+                        shardList.appendChild(row);
+                    });
+                }
+            } catch (err) {
+                log('System error: ' + err.message);
+            }
         }
 
-        // Initial Load
-        document.addEventListener('DOMContentLoaded', loadFiles);
+        shredBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file || !supabaseClient) return;
+
+            overlay.classList.remove('hidden');
+            shredBtn.disabled = true;
+            log(`Initiating shredding for ${file.name}...`);
+
+            try {
+                const fragmentCount = 4;
+                const chunkSize = Math.ceil(file.size / fragmentCount);
+                const folderId = `${file.name.replace(/\s+/g, '_')}_${Date.now()}`;
+
+                for (let i = 0; i < fragmentCount; i++) {
+                    const start = i * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+                    
+                    const { error } = await supabaseClient.storage
+                        .from(BUCKET_NAME)
+                        .upload(`${folderId}/part_${i}.bin`, chunk);
+                    
+                    if (error) throw error;
+                    log(`Fragment ${i+1}/${fragmentCount} distributed.`);
+                }
+
+                log(`Successfully shredded ${file.name}.`);
+                showToast('Data shredded successfully');
+                fileInput.value = '';
+                fileNameLabel.innerText = 'Drag or click to select file';
+                fetchShards();
+            } catch (err) {
+                log('Shredding failed: ' + err.message);
+                showToast('Operation failed');
+            } finally {
+                overlay.classList.add('hidden');
+                shredBtn.disabled = false;
+            }
+        });
+
+        async function downloadAndAssemble(folderName) {
+            if (!supabaseClient) return;
+            log(`Retrieving fragments from ${folderName}...`);
+            try {
+                const { data: files, error: listError } = await supabaseClient.storage.from(BUCKET_NAME).list(folderName);
+                if (listError) throw listError;
+
+                // Sort files numerically (part_0, part_1...)
+                files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+                const chunks = [];
+                for (const fileInfo of files) {
+                    const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).download(`${folderName}/${fileInfo.name}`);
+                    if (error) throw error;
+                    chunks.push(data);
+                }
+
+                const blob = new Blob(chunks);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                
+                // Clean filename recovery
+                const originalName = folderName.substring(0, folderName.lastIndexOf('_'));
+                a.href = url;
+                a.download = originalName || folderName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                log('Reassembly complete. Download started.');
+                showToast('File reassembled');
+            } catch (err) {
+                log('Download failed: ' + err.message);
+            }
+        }
+
+        async function deleteShred(folderName) {
+            if (!supabaseClient) return;
+            if (!confirm(`Purge all fragments for ${folderName}?`)) return;
+            
+            log(`Purging fragments in ${folderName}...`);
+            try {
+                const { data: files, error: listError } = await supabaseClient.storage.from(BUCKET_NAME).list(folderName);
+                if (listError) throw listError;
+
+                const paths = files.map(f => `${folderName}/${f.name}`);
+                const { error: delError } = await supabaseClient.storage.from(BUCKET_NAME).remove(paths);
+                
+                if (delError) throw delError;
+                
+                log('Fragments purged from cloud vault.');
+                showToast('Fragments deleted');
+                fetchShards();
+            } catch (err) {
+                log('Purge failed: ' + err.message);
+            }
+        }
     </script>
 </body>
 </html>
