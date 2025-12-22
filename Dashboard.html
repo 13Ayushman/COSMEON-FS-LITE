@@ -3,263 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>COSMEON Vault | Secure Artifact Registry</title>
+    <title>COSMEON | Cloud Inventory</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #050505;
-            color: #e2e8f0;
-            overflow-x: hidden;
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+        body { 
+            background: #050505; 
+            color: #fff; 
+            font-family: 'Space Grotesk', sans-serif; 
+            background-image: radial-gradient(circle at 50% 50%, #111 0%, #050505 100%);
         }
-        .mono { font-family: 'JetBrains Mono', monospace; }
-        .glass {
-            background: rgba(10, 10, 10, 0.8);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .glow-yellow {
-            box-shadow: 0 0 20px rgba(234, 179, 8, 0.2);
-        }
-        .shimmer {
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-            background-size: 200% 100%;
-            animation: shimmer 2s infinite;
-        }
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #050505; }
-        ::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #eab308; }
+        .glass { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+        .shimmer { animation: shimmer 2s infinite; }
+        @keyframes shimmer { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
     </style>
 </head>
-<body class="selection:bg-yellow-500 selection:text-black">
-
-    <!-- Top Navigation -->
-    <nav class="sticky top-0 z-50 glass border-b border-white/5 h-16">
-        <div class="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-600 rounded-lg flex items-center justify-center glow-yellow">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                </div>
-                <span class="text-xl font-black tracking-tighter text-white">COSMEON</span>
+<body class="p-4 md:p-12 min-h-screen">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+            <div>
+                <h1 class="text-3xl font-black italic tracking-tighter">COSMEON <span class="text-blue-500">FS-LITE</span></h1>
+                <p class="text-gray-500 text-xs uppercase tracking-[0.2em] mt-1">Distributed Shard Repository</p>
             </div>
             
-            <div class="flex items-center gap-6">
-                <div class="hidden md:flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Live</span>
+            <div class="flex flex-wrap gap-4 items-center">
+                <div class="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
+                    <span class="w-2 h-2 bg-green-500 rounded-full shimmer"></span>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-green-500">Engine Live</span>
                 </div>
-                <div class="h-6 w-[1px] bg-white/10"></div>
-                <div class="text-[10px] font-black text-yellow-500 mono">VAULT_v2.4.0</div>
+                <a href="vault.html" class="bg-blue-600 hover:bg-blue-500 transition-colors px-6 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/20">
+                    + New Asset
+                </a>
             </div>
         </div>
-    </nav>
 
-    <main class="max-w-7xl mx-auto px-6 py-10">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            
-            <!-- Sidebar -->
-            <aside class="lg:col-span-3 space-y-6">
-                <div class="glass rounded-2xl p-6">
-                    <h2 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-6">Security Actions</h2>
-                    
-                    <label class="group relative w-full flex flex-col items-center justify-center h-44 border-2 border-dashed border-white/10 rounded-xl hover:border-yellow-500/50 hover:bg-yellow-500/[0.02] transition-all cursor-pointer overflow-hidden" id="dropZone">
-                        <input type="file" id="fileInput" class="hidden" />
-                        <div id="uploadUI" class="flex flex-col items-center text-center px-4">
-                            <div class="p-3 bg-white/5 rounded-full mb-3 group-hover:scale-110 transition-transform">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-slate-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            </div>
-                            <span class="text-[10px] font-bold text-slate-300 uppercase">Deposit Artifact</span>
-                            <span class="text-[9px] text-slate-500 mt-1 uppercase tracking-tighter">Click or drag to encrypt</span>
-                        </div>
-                        <div id="loadingUI" class="hidden flex flex-col items-center">
-                            <svg class="animate-spin h-8 w-8 text-yellow-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            <span class="text-[10px] font-bold text-yellow-500 uppercase animate-pulse">Encrypting Shards...</span>
-                        </div>
-                    </label>
-
-                    <div class="mt-8 space-y-4">
-                        <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-tighter">
-                            <span class="text-slate-500">Vault Capacity</span>
-                            <span class="text-white">2.4 / 50 GB</span>
-                        </div>
-                        <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                            <div class="h-full bg-yellow-500 w-[5%] shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="glass rounded-2xl p-6">
-                    <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Encryption Nodes</h3>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between p-3 rounded-lg bg-black/40 border border-white/5">
-                            <span class="text-[10px] mono text-slate-400">AMER-EAST-1</span>
-                            <span class="text-[9px] font-bold text-green-500 uppercase">Online</span>
-                        </div>
-                        <div class="flex items-center justify-between p-3 rounded-lg bg-black/40 border border-white/5">
-                            <span class="text-[10px] mono text-slate-400">EURO-CENT-4</span>
-                            <span class="text-[9px] font-bold text-green-500 uppercase">Online</span>
-                        </div>
-                    </div>
-                </div>
-            </aside>
-
-            <!-- Main Content Area -->
-            <section class="lg:col-span-9">
-                <div class="glass rounded-2xl overflow-hidden">
-                    <div class="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-xl font-bold tracking-tight text-white">Artifact Registry</h2>
-                            <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-1">End-to-End Encrypted Storage</p>
-                        </div>
-                        <div class="relative">
-                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" id="searchInput" placeholder="Search registry..." class="bg-black border border-white/10 rounded-lg pl-10 pr-4 py-2 text-xs focus:outline-none focus:border-yellow-500/50 w-full md:w-64 transition-all">
-                        </div>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead>
-                                <tr class="text-[10px] text-slate-500 uppercase tracking-widest border-b border-white/5 bg-black/40">
-                                    <th class="px-6 py-4 font-black">Identifier / Asset</th>
-                                    <th class="px-6 py-4 font-black">Size</th>
-                                    <th class="px-6 py-4 font-black">Created</th>
-                                    <th class="px-6 py-4 font-black text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="fileRegistry" class="divide-y divide-white/5">
-                                <!-- Initial Data -->
-                                <tr class="group hover:bg-yellow-500/[0.02] transition-colors">
-                                    <td class="px-6 py-5">
-                                        <div class="flex items-center gap-3">
-                                            <div class="p-2 bg-white/5 rounded-lg group-hover:bg-yellow-500/10 transition-colors">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-slate-500 group-hover:text-yellow-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                            </div>
-                                            <div>
-                                                <div class="text-sm font-bold text-white group-hover:text-yellow-500 transition-colors">orbital_traj_v4.pdf</div>
-                                                <div class="text-[10px] mono text-slate-600 uppercase tracking-tighter">CS-8829-X</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-5 text-xs text-slate-400 font-medium">2.4 MB</td>
-                                    <td class="px-6 py-5 text-xs text-slate-400 italic">2025-12-22</td>
-                                    <td class="px-6 py-5 text-right">
-                                        <button onclick="downloadFile('orbital_traj_v4.pdf')" class="inline-flex items-center gap-2 bg-white text-black text-[10px] font-black px-4 py-2 rounded-lg hover:bg-yellow-500 transition-all active:scale-95 shadow-lg">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                            DOWNLOAD
-                                        </button>
-                                    </td>
-                                </tr>
-                                <!-- More items can be added here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </main>
-
-    <footer class="mt-20 border-t border-white/5 py-12">
-        <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div class="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em]">
-                © 2025 COSMEON SECURITY SYSTEMS • ALL RIGHTS RESERVED
-            </div>
-            <div class="flex gap-8 text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                <a href="#" class="hover:text-yellow-500 transition-colors">Documentation</a>
-                <a href="#" class="hover:text-yellow-500 transition-colors">Privacy Policy</a>
-                <a href="#" class="hover:text-yellow-500 transition-colors">Global Status</a>
+        <!-- Inventory State -->
+        <div id="fileList" class="glass rounded-3xl overflow-hidden divide-y divide-white/5 min-h-[300px] flex flex-col justify-center">
+            <div class="p-20 text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+                <p class="text-gray-500 italic text-sm">Synchronizing with Render Cluster...</p>
             </div>
         </div>
-    </footer>
+
+        <!-- Footer Stats -->
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="glass p-4 rounded-2xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold">Protocol</p>
+                <p class="text-sm font-mono text-blue-400">AES-256 + Sharding</p>
+            </div>
+            <div class="glass p-4 rounded-2xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold">Backend Status</p>
+                <p class="text-sm font-mono text-green-400">Connected</p>
+            </div>
+            <div class="glass p-4 rounded-2xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold">Node URL</p>
+                <p class="text-sm font-mono text-gray-400 truncate">cosmeon-fs-lite.onrender.com</p>
+            </div>
+        </div>
+    </div>
 
     <script>
-        const fileInput = document.getElementById('fileInput');
-        const uploadUI = document.getElementById('uploadUI');
-        const loadingUI = document.getElementById('loadingUI');
-        const fileRegistry = document.getElementById('fileRegistry');
-        const searchInput = document.getElementById('searchInput');
+        const API_URL = 'https://cosmeon-fs-lite.onrender.com';
 
-        // Handle File Upload Simulation
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            // Transition to loading state
-            uploadUI.classList.add('hidden');
-            loadingUI.classList.remove('hidden');
-
-            // Simulate "Encryption" and "Upload"
-            setTimeout(() => {
-                addFileToRegistry(file.name, (file.size / (1024 * 1024)).toFixed(2) + ' MB');
+        async function loadFiles() {
+            const list = document.getElementById('fileList');
+            try {
+                const res = await fetch(`${API_URL}/files`);
+                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
                 
-                // Reset UI
-                uploadUI.classList.remove('hidden');
-                loadingUI.classList.add('hidden');
-                fileInput.value = '';
-            }, 1800);
-        });
+                const data = await res.json();
+                // Handle different possible response formats from PocketHost/Backend
+                const files = Array.isArray(data) ? data : (data.items || []);
 
-        function addFileToRegistry(name, size) {
-            const id = 'CS-' + Math.floor(1000 + Math.random() * 9000) + '-Z';
-            const date = new Date().toISOString().split('T')[0];
-
-            const row = document.createElement('tr');
-            row.className = "group hover:bg-yellow-500/[0.02] transition-colors";
-            row.innerHTML = `
-                <td class="px-6 py-5">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-white/5 rounded-lg group-hover:bg-yellow-500/10 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-slate-500 group-hover:text-yellow-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                if(files.length === 0) {
+                    list.innerHTML = `
+                        <div class="p-20 text-center">
+                            <p class="text-gray-600 mb-2">No encrypted shards detected in the vault.</p>
+                            <p class="text-[10px] text-gray-700 uppercase tracking-widest">Waiting for initial upload...</p>
                         </div>
-                        <div>
-                            <div class="text-sm font-bold text-white group-hover:text-yellow-500 transition-colors">${name}</div>
-                            <div class="text-[10px] mono text-slate-600 uppercase tracking-tighter">${id}</div>
+                    `;
+                    return;
+                }
+
+                list.innerHTML = files.map(f => `
+                    <div class="p-6 flex flex-col md:flex-row justify-between items-start md:items-center hover:bg-white/[0.04] transition-all group">
+                        <div class="mb-4 md:mb-0">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-gray-200 group-hover:text-blue-400 transition-colors">${f.filename || f.original_name}</h3>
+                                    <p class="text-[10px] text-gray-500 font-mono mt-0.5">ID: ${f.file_id || f.id}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+                            <div class="text-right hidden sm:block">
+                                <p class="text-[9px] text-gray-500 uppercase tracking-tighter">Availability</p>
+                                <p class="text-[10px] text-green-500 font-bold">3/3 SHARDS READY</p>
+                            </div>
+                            <button onclick="download('${f.file_id || f.id}')" 
+                                class="bg-white/5 hover:bg-blue-600/20 border border-white/10 hover:border-blue-500/50 px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all">
+                                Reconstruct
+                            </button>
                         </div>
                     </div>
-                </td>
-                <td class="px-6 py-5 text-xs text-slate-400 font-medium">${size}</td>
-                <td class="px-6 py-5 text-xs text-slate-400 italic">${date}</td>
-                <td class="px-6 py-5 text-right">
-                    <button onclick="downloadFile('${name}')" class="inline-flex items-center gap-2 bg-white text-black text-[10px] font-black px-4 py-2 rounded-lg hover:bg-yellow-500 transition-all active:scale-95 shadow-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        DOWNLOAD
-                    </button>
-                </td>
-            `;
-            fileRegistry.prepend(row);
+                `).join('');
+            } catch (e) {
+                console.error("Fetch error:", e);
+                list.innerHTML = `
+                    <div class="p-20 text-center">
+                        <p class="text-red-500 font-bold mb-2">Sync Error</p>
+                        <p class="text-gray-500 text-xs">${e.message}</p>
+                        <button onclick="loadFiles()" class="mt-4 text-blue-500 text-[10px] uppercase underline">Retry Connection</button>
+                    </div>
+                `;
+            }
         }
 
-        // Real Download Logic
-        function downloadFile(filename) {
-            // Simulated content generation - in production this would be a link to your server
-            const blob = new Blob([`Security-wrapped content of ${filename}`], { type: 'text/plain' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+        function download(id) {
+            // Pointing directly to the reconstruct endpoint on Render
+            const downloadUrl = `${API_URL}/reconstruct/${id}`;
+            
+            // UI feedback
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "SHREDDING...";
+            btn.disabled = true;
+            
+            setTimeout(() => {
+                window.location.href = downloadUrl;
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }, 1000);
         }
 
-        // Simple Search Filter
-        searchInput.addEventListener('input', function(e) {
-            const term = e.target.value.toLowerCase();
-            const rows = fileRegistry.querySelectorAll('tr');
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(term) ? '' : 'none';
-            });
-        });
+        // Initial Load
+        document.addEventListener('DOMContentLoaded', loadFiles);
     </script>
 </body>
 </html>
