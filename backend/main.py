@@ -24,6 +24,14 @@ cloudinary.config(
 # FastAPI App
 # ----------------------------
 app = FastAPI(title="COSMEON Cloud Shredder API")
+@app.get("/")
+def root():
+    return {
+        "status": "Cosmeon Backend Online",
+        "cloud": "Cloudinary",
+        "service": "Distributed Shredder API"
+    }
+
 
 app.add_middleware(
     CORSMiddleware,
